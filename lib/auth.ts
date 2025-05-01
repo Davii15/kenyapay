@@ -1,4 +1,4 @@
-import { CredentialsProvider } from "next-auth/providers/credentials"
+import  CredentialsProvider  from "next-auth/providers/credentials"
 import type { NextAuthOptions } from "next-auth"
 import { supabase } from "./supabaseClient"
 import type { User } from "./supabaseClient"
