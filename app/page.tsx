@@ -65,11 +65,16 @@ export default function Home() {
             style={{ animationDelay: "0.7s" }}
           >
             <div className="relative aspect-video w-full overflow-hidden">
-              <img
-                src="/placeholder.svg?height=500&width=900"
-                alt="KenyaPay App Demo"
-                className="h-full w-full object-cover"
-              />
+            <video
+          src="/kenyapaytourist.mp4"
+        className="h-full w-full object-cover"
+      autoPlay
+      muted
+      loop
+      playsInline
+     poster="/placeholder-logo.svg?height=500&width=900" // fallback image before video loads
+     />
+
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="rounded-full bg-gradient-to-r from-green-600 to-amber-600 p-4 animate-pulse">
                   <svg
