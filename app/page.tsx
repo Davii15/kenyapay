@@ -14,6 +14,11 @@ import {
 import { Button } from "@/components/ui/button"
 import { TermsOfService, PrivacyPolicy, CookiePolicy, RefundPolicy } from "@/components/legal-popover"
 import { CurrencyConverter } from "@/components/currency-converter"
+import { TrustedPartners } from "@/components/trusted-partners"
+import { BusinessAdvertising } from "@/components/business-advertising"
+
+
+
 
 export default function Home() {
   return (
@@ -116,6 +121,10 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      <TrustedPartners />
+
+
 
       {/* Trusted By Section */}
       <section className="border-y bg-white dark:bg-gray-900">
@@ -220,6 +229,8 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      <BusinessAdvertising />
 
       {/* How It Works Section */}
       <section

@@ -12,42 +12,55 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { UserGreeting } from "@/components/user-greeting"
+import { login } from "@/lib/auth"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useToast } from "@/components/ui/use-toast"
 
 export default function LoginPage() {
   const router = useRouter()
+  const { toast } = useToast()
   const [userType, setUserType] = useState("tourist")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
+    setError(null)
 
-    // Simulate login process
-    setTimeout(() => {
-      setIsLoading(false)
+    try {
+      const result = await login({ email, password })
 
-      // Store user in localStorage for demo purposes
-      localStorage.setItem(
-        "kenyapay_user",
-        JSON.stringify({
-          id: "user-" + Date.now(),
-          name: email.split("@")[0], // Simple name extraction from email
-          email: email,
-          role: userType,
-        }),
-      )
+      if (!result.user) {
+        throw new Error("Login failed. Please check your credentials.")
+      }
+
+      // Check if user role matches selected tab
+      if (result.user.role !== userType) {
+        throw new Error(`This account is registered as a ${result.user.role}. Please select the correct account type.`)
+      }
+
+      toast({
+        title: "Login successful",
+        description: `Welcome back, ${result.user.name}!`,
+      })
 
       // Redirect based on user type
-      if (userType === "tourist") {
+      if (result.user.role === "tourist") {
         router.push("/tourist/dashboard")
-      } else if (userType === "business") {
+      } else if (result.user.role === "business") {
         router.push("/business/dashboard")
-      } else if (userType === "admin") {
+      } else if (result.user.role === "admin") {
         router.push("/admin")
       }
-    }, 1500)
+    } catch (err) {
+      console.error("Login error:", err)
+      setError((err as Error).message || "An error occurred during login")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -79,6 +92,11 @@ export default function LoginPage() {
             </Tabs>
           </CardHeader>
           <CardContent>
+            {error && (
+              <Alert variant="destructive" className="mb-4">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
@@ -94,7 +112,7 @@ export default function LoginPage() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="password">Password</Label>
-                  <Link href="#" className="text-xs text-primary hover:underline">
+                  <Link href="/forgot-password" className="text-xs text-primary hover:underline">
                     Forgot password?
                   </Link>
                 </div>

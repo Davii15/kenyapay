@@ -11,12 +11,12 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { supabase } from "@/lib/supabaseClient"
 
 export default function AdminLoginPage() {
   const router = useRouter()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [adminCode, setAdminCode] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -26,32 +26,54 @@ export default function AdminLoginPage() {
     setError(null)
 
     try {
-      // In a real implementation, this would verify admin credentials with Supabase
-      // and check the admin code against a secure value
+      // Authenticate with Supabase
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
 
-      // Simulate login process with a delay
-      await new Promise((resolve) => setTimeout(resolve, 1500))
+      if (authError) throw authError
 
-      // For demo purposes only - in production this would be a real auth check
-      if (email.includes("admin") && password.length >= 6 && adminCode === "ADMIN123") {
-        // Store admin session
-        localStorage.setItem(
-          "kenyapay_user",
-          JSON.stringify({
-            id: "admin-id",
-            name: "Admin User",
-            email: email,
-            role: "admin",
-          }),
-        )
-
-        router.push("/admin")
-      } else {
-        setError("Invalid admin credentials or access code")
+      if (!authData.user) {
+        throw new Error("Authentication failed")
       }
-    } catch (err) {
-      setError("An error occurred during login. Please try again.")
+
+      // Check if user is an admin
+      const { data: userData, error: userError } = await supabase
+        .from("users")
+        .select("role")
+        .eq("id", authData.user.id)
+        .single()
+
+      if (userError) throw userError
+
+      if (userData.role !== "admin") {
+        // Log unauthorized access attempt
+        await supabase.from("admin_logs").insert({
+          admin_id: authData.user.id,
+          action: "login_attempt",
+          entity_type: "admin_panel",
+          details: { status: "unauthorized", email },
+          ip_address: "client-side", // In production, you'd get this from the server
+        })
+
+        throw new Error("Unauthorized access. Only admins can access this area.")
+      }
+
+      // Log successful login
+      await supabase.from("admin_logs").insert({
+        admin_id: authData.user.id,
+        action: "login",
+        entity_type: "admin_panel",
+        details: { status: "success" },
+        ip_address: "client-side", // In production, you'd get this from the server
+      })
+
+      // Redirect to admin dashboard
+      router.push("/admin")
+    } catch (err: any) {
       console.error("Admin login error:", err)
+      setError(err.message || "Login failed. Please check your credentials.")
     } finally {
       setIsLoading(false)
     }
@@ -108,18 +130,6 @@ export default function AdminLoginPage() {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="adminCode">Admin Access Code</Label>
-                <Input
-                  id="adminCode"
-                  type="password"
-                  placeholder="Enter your admin access code"
-                  value={adminCode}
-                  onChange={(e) => setAdminCode(e.target.value)}
                   required
                 />
               </div>

@@ -14,9 +14,12 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { UserGreeting } from "@/components/user-greeting"
+import { signUp } from "@/lib/auth"
+import { useToast } from "@/components/ui/use-toast"
 
 export default function SignupPage() {
   const router = useRouter()
+  const { toast } = useToast()
   const [userType, setUserType] = useState("tourist")
   const [formData, setFormData] = useState({
     fullName: "",
@@ -73,23 +76,30 @@ export default function SignupPage() {
     }
 
     try {
-      // In a real implementation, this would call the signUp function from auth.ts
-      // which would handle file uploads to Supabase storage
+      // Prepare signup data
+      const signupData = {
+        email: formData.email,
+        password: formData.password,
+        name: userType === "tourist" ? formData.fullName : formData.businessName,
+        role: userType as "tourist" | "business" | "admin",
+        country: userType === "tourist" ? formData.country : undefined,
+        businessName: userType === "business" ? formData.businessName : undefined,
+        businessType: userType === "business" ? formData.businessType : undefined,
+        passportFile: userType === "tourist" ? formData.passportFile : null,
+        businessLicenseFile: userType === "business" ? formData.businessLicenseFile : null,
+      }
 
-      // Simulate signup process with a delay
-      await new Promise((resolve) => setTimeout(resolve, 1500))
+      // Call signup function
+      const result = await signUp(signupData)
 
-      // For demo purposes only - in production this would be a real auth call
-      localStorage.setItem(
-        "kenyapay_user",
-        JSON.stringify({
-          id: "user-" + Date.now(),
-          name: userType === "tourist" ? formData.fullName : formData.businessName,
-          email: formData.email,
-          role: userType,
-          verification_status: "pending",
-        }),
-      )
+      if (!result.user) {
+        throw new Error("Signup failed. Please try again.")
+      }
+
+      toast({
+        title: "Account created successfully",
+        description: "Your account has been created and is pending verification.",
+      })
 
       // Redirect based on user type
       if (userType === "tourist") {
