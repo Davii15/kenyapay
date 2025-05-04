@@ -1,11 +1,4 @@
-
-import  CredentialsProvider  from "next-auth/providers/credentials"
-import type { NextAuthOptions } from "next-auth"
-import { supabase } from "./supabaseClient"
-import type { User } from "./supabaseClient"
-
 import { type SupabaseClientOptions, createClient } from "@supabase/supabase-js"
-import { cookies } from "next/headers"
 
 // Check for environment variables and provide helpful error messages
 if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
@@ -64,23 +57,6 @@ export function createClientComponentClient<Database = any>(options?: SupabaseCl
     )
   }
   return createClient<Database>(supabaseUrl, supabaseAnonKey, options)
-}
-
-export function createServerClient<Database = any>() {
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error(
-      "Supabase credentials not found. Please make sure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set in your environment variables.",
-    )
-  }
-
-  const cookieStore = cookies()
-  return createClient<Database>(supabaseUrl, supabaseAnonKey, {
-    cookies: {
-      get(name: string) {
-        return cookieStore.get(name)?.value
-      },
-    },
-  })
 }
 
 // Authentication functions
