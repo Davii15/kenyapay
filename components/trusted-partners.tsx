@@ -1,139 +1,177 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 
 type Partner = {
   name: string
-  logo?: string
+  id: string
 }
 
-const partners: Partner[] = [
-  { name: "Safari Adventures Ltd" },
-  { name: "Nairobi National Park" },
-  { name: "Kenya Tourism Board" },
-  { name: "Maasai Mara Reserve" },
-  { name: "Serena Hotels" },
-  { name: "Kenya Airways" },
-  { name: "Safaricom" },
-  { name: "Equity Bank" },
+const partners1: Partner[] = [
+  { name: "Kenya Tourism Board", id: "ktb" },
+  { name: "Safaricom", id: "safaricom" },
+  { name: "Kenya Airways", id: "kq" },
+  { name: "Serena Hotels", id: "serena" },
+  { name: "Maasai Mara Reserve", id: "mara" },
+  { name: "Equity Bank", id: "equity" },
 ]
 
 const partners2: Partner[] = [
-  { name: "Amboseli National Park" },
-  { name: "Tsavo East National Park" },
-  { name: "Lake Nakuru National Park" },
-  { name: "Mount Kenya National Park" },
-  { name: "Diani Beach Resort" },
-  { name: "Giraffe Centre" },
-  { name: "David Sheldrick Wildlife Trust" },
-  { name: "Kenya Wildlife Service" },
+  { name: "Nairobi National Park", id: "nnp" },
+  { name: "Sarova Hotels", id: "sarova" },
+  { name: "Jambojet", id: "jambojet" },
+  { name: "NCBA Bank", id: "ncba" },
+  { name: "Tsavo National Park", id: "tsavo" },
+  { name: "Fairmont Hotels", id: "fairmont" },
 ]
 
 export function TrustedPartners() {
   const scrollRef1 = useRef<HTMLDivElement>(null)
   const scrollRef2 = useRef<HTMLDivElement>(null)
+  const [isVisible, setIsVisible] = useState(false)
+  const animationRef1 = useRef<number>()
+  const animationRef2 = useRef<number>()
+  const speedFactor = 0.5
 
-  // Animation for the scrolling text
+  // Duplicate the partners to create a seamless loop
+  const extendedPartners1 = [...partners1, ...partners1]
+  const extendedPartners2 = [...partners2, ...partners2]
+
   useEffect(() => {
-    const scroll1 = scrollRef1.current
-    const scroll2 = scrollRef2.current
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          setIsVisible(entry.isIntersecting)
+        })
+      },
+      { threshold: 0.1 },
+    )
 
-    if (!scroll1 || !scroll2) return
-
-    let animationFrame1: number
-    let animationFrame2: number
-    let position1 = 0
-    let position2 = 0
-
-    const animate1 = () => {
-      position1 += 0.5 // Speed of movement
-      if (position1 >= scroll1.scrollWidth / 2) {
-        position1 = 0
-      }
-      scroll1.style.transform = `translateX(${position1}px)`
-      animationFrame1 = requestAnimationFrame(animate1)
+    const currentElement = document.getElementById("trusted-partners")
+    if (currentElement) {
+      observer.observe(currentElement)
     }
-
-    const animate2 = () => {
-      position2 -= 0.5 // Speed of movement in opposite direction
-      if (position2 <= -scroll2.scrollWidth / 2) {
-        position2 = 0
-      }
-      scroll2.style.transform = `translateX(${position2}px)`
-      animationFrame2 = requestAnimationFrame(animate2)
-    }
-
-    animationFrame1 = requestAnimationFrame(animate1)
-    animationFrame2 = requestAnimationFrame(animate2)
 
     return () => {
-      cancelAnimationFrame(animationFrame1)
-      cancelAnimationFrame(animationFrame2)
+      if (currentElement) {
+        observer.unobserve(currentElement)
+      }
     }
   }, [])
 
+  useEffect(() => {
+    let lastTime1 = 0
+    let position1 = 0
+    let lastTime2 = 0
+    let position2 = 0
+
+    const animate1 = (time: number) => {
+      if (lastTime1 === 0) {
+        lastTime1 = time
+      }
+      const delta = time - lastTime1
+      lastTime1 = time
+
+      if (scrollRef1.current) {
+        position1 += delta * speedFactor * 0.01
+
+        // Reset position when we've scrolled the width of half the content (original partners)
+        if (position1 >= scrollRef1.current.scrollWidth / 2) {
+          position1 = 0
+        }
+
+        scrollRef1.current.style.transform = `translateX(${position1}px)`
+      }
+
+      if (isVisible) {
+        animationRef1.current = requestAnimationFrame(animate1)
+      }
+    }
+
+    const animate2 = (time: number) => {
+      if (lastTime2 === 0) {
+        lastTime2 = time
+      }
+      const delta = time - lastTime2
+      lastTime2 = time
+
+      if (scrollRef2.current) {
+        position2 -= delta * speedFactor * 0.01
+
+        // Reset position when we've scrolled the width of half the content (original partners)
+        if (Math.abs(position2) >= scrollRef2.current.scrollWidth / 2) {
+          position2 = 0
+        }
+
+        scrollRef2.current.style.transform = `translateX(${position2}px)`
+      }
+
+      if (isVisible) {
+        animationRef2.current = requestAnimationFrame(animate2)
+      }
+    }
+
+    if (isVisible) {
+      animationRef1.current = requestAnimationFrame(animate1)
+      animationRef2.current = requestAnimationFrame(animate2)
+    }
+
+    return () => {
+      if (animationRef1.current) {
+        cancelAnimationFrame(animationRef1.current)
+      }
+      if (animationRef2.current) {
+        cancelAnimationFrame(animationRef2.current)
+      }
+    }
+  }, [isVisible])
+
   return (
-    <section className="relative py-12 overflow-hidden bg-gradient-to-r from-green-900 to-amber-900 text-white">
-      {/* Background pattern */}
-      <div className="absolute inset-0 opacity-10">
-        <div className="absolute inset-0 bg-[url('/placeholder.svg?height=500&width=1000')] bg-repeat"></div>
-      </div>
+    <section
+      id="trusted-partners"
+      className="relative w-full overflow-hidden bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 py-10"
+    >
+      <div className="container mx-auto px-4">
+        <h2 className="mb-8 text-center text-2xl font-bold text-primary md:text-3xl">Our Trusted Partners</h2>
 
-      <div className="container mb-8">
-        <h2 className="text-3xl font-bold text-center mb-2">Our Trusted Partners</h2>
-        <p className="text-center text-green-100 max-w-2xl mx-auto">
-          We collaborate with Kenya's leading tourism and financial institutions to provide you with the best
-          experience.
-        </p>
-      </div>
+        {/* Left to right scrolling text */}
+        <div className="relative mb-8 overflow-hidden">
+          <div className="absolute left-0 top-0 z-10 h-full w-16 bg-gradient-to-r from-background to-transparent"></div>
+          <div className="absolute right-0 top-0 z-10 h-full w-16 bg-gradient-to-l from-background to-transparent"></div>
 
-      {/* First scrolling row - left to right */}
-      <div className="relative mb-8 overflow-hidden">
-        <div className="flex whitespace-nowrap" ref={scrollRef1}>
-          {/* Double the partners to create seamless loop */}
-          {[...partners, ...partners].map((partner, index) => (
-            <div
-              key={`${partner.name}-${index}`}
-              className="inline-flex items-center justify-center mx-8 py-4 px-6 bg-white/10 backdrop-blur-sm rounded-lg min-w-[200px]"
-            >
-              {partner.logo ? (
-                <img src={partner.logo || "/placeholder.svg"} alt={partner.name} className="h-8 mr-3" />
-              ) : (
-                <div className="h-8 w-8 rounded-full bg-green-500/20 flex items-center justify-center mr-3">
-                  <span className="text-lg font-bold">{partner.name.charAt(0)}</span>
+          <div className="flex whitespace-nowrap">
+            <div ref={scrollRef1} className="flex items-center gap-12 py-4">
+              {extendedPartners1.map((partner, index) => (
+                <div
+                  key={`${partner.id}-${index}`}
+                  className="flex items-center rounded-lg bg-white/80 px-6 py-3 shadow-md transition-all hover:bg-white hover:shadow-lg"
+                >
+                  <span className="text-lg font-medium text-primary">{partner.name}</span>
                 </div>
-              )}
-              <span className="font-semibold">{partner.name}</span>
+              ))}
             </div>
-          ))}
+          </div>
+        </div>
+
+        {/* Right to left scrolling text */}
+        <div className="relative overflow-hidden">
+          <div className="absolute left-0 top-0 z-10 h-full w-16 bg-gradient-to-r from-background to-transparent"></div>
+          <div className="absolute right-0 top-0 z-10 h-full w-16 bg-gradient-to-l from-background to-transparent"></div>
+
+          <div className="flex whitespace-nowrap">
+            <div ref={scrollRef2} className="flex items-center gap-12 py-4">
+              {extendedPartners2.map((partner, index) => (
+                <div
+                  key={`${partner.id}-${index}`}
+                  className="flex items-center rounded-lg bg-white/80 px-6 py-3 shadow-md transition-all hover:bg-white hover:shadow-lg"
+                >
+                  <span className="text-lg font-medium text-primary">{partner.name}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
-
-      {/* Second scrolling row - right to left */}
-      <div className="relative overflow-hidden">
-        <div className="flex whitespace-nowrap" ref={scrollRef2}>
-          {/* Double the partners to create seamless loop */}
-          {[...partners2, ...partners2].map((partner, index) => (
-            <div
-              key={`${partner.name}-${index}`}
-              className="inline-flex items-center justify-center mx-8 py-4 px-6 bg-white/10 backdrop-blur-sm rounded-lg min-w-[200px]"
-            >
-              {partner.logo ? (
-                <img src={partner.logo || "/placeholder.svg"} alt={partner.name} className="h-8 mr-3" />
-              ) : (
-                <div className="h-8 w-8 rounded-full bg-amber-500/20 flex items-center justify-center mr-3">
-                  <span className="text-lg font-bold">{partner.name.charAt(0)}</span>
-                </div>
-              )}
-              <span className="font-semibold">{partner.name}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Gradient overlays for fade effect */}
-      <div className="absolute top-0 bottom-0 left-0 w-24 bg-gradient-to-r from-green-900 to-transparent pointer-events-none"></div>
-      <div className="absolute top-0 bottom-0 right-0 w-24 bg-gradient-to-l from-amber-900 to-transparent pointer-events-none"></div>
     </section>
   )
 }
