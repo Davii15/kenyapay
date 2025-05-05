@@ -1,42 +1,8 @@
-import { type SupabaseClientOptions, createClient } from "@supabase/supabase-js"
+import type { SupabaseClientOptions } from "@supabase/supabase-js"
 import type { NextAuthOptions } from "next-auth"
 // Fix the import - CredentialsProvider is a default export, not a named export
 import CredentialsProvider from "next-auth/providers/credentials"
-
-// First, declare all variables before using them
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ""
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
-
-// Then check for environment variables and provide helpful error messages
-if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
-  console.error("ERROR: Missing environment variable NEXT_PUBLIC_SUPABASE_URL")
-}
-
-if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-  console.error("ERROR: Missing environment variable NEXT_PUBLIC_SUPABASE_ANON_KEY")
-}
-
-// Create a function to get the Supabase client to ensure it's only created when needed
-// This helps with SSR and environment variable loading timing
-function getSupabaseClient() {
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error(
-      "Supabase credentials not found. Please make sure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set in your environment variables.",
-    )
-  }
-  return createClient(supabaseUrl, supabaseAnonKey)
-}
-
-// Lazy-loaded Supabase client
-let _supabaseClient: ReturnType<typeof createClient> | null = null
-
-// Get the Supabase client, creating it if it doesn't exist
-function getSupabase() {
-  if (!_supabaseClient) {
-    _supabaseClient = getSupabaseClient()
-  }
-  return _supabaseClient
-}
+import { getSupabase } from "@/lib/supabaseClient"
 
 // Properly define authOptions as NextAuthOptions type
 export const authOptions: NextAuthOptions = {
@@ -102,11 +68,17 @@ export const authOptions: NextAuthOptions = {
 }
 
 export function createClientComponentClient<Database = any>(options?: SupabaseClientOptions<"public">) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ""
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
+
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error(
       "Supabase credentials not found. Please make sure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set in your environment variables.",
     )
   }
+
+  // Import createClient dynamically to avoid initialization issues
+  const { createClient } = require("@supabase/supabase-js")
   return createClient<Database>(supabaseUrl, supabaseAnonKey, options)
 }
 
