@@ -97,7 +97,6 @@ export type Topup = {
   updated_at: string
 }
 
-// Initialize Supabase client
 // First declare the variables before using them
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ""
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
@@ -107,7 +106,29 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.error("Missing Supabase environment variables")
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+// Create a function to get the Supabase client to ensure it's only created when needed
+function getSupabaseClient() {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error(
+      "Supabase credentials not found. Please make sure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set in your environment variables.",
+    )
+  }
+  return createClient(supabaseUrl, supabaseAnonKey)
+}
+
+// Lazy-loaded Supabase client
+let _supabaseClient: ReturnType<typeof createClient> | null = null
+
+// Get the Supabase client, creating it if it doesn't exist
+export function getSupabase() {
+  if (!_supabaseClient) {
+    _supabaseClient = getSupabaseClient()
+  }
+  return _supabaseClient
+}
+
+// Export the supabase client for direct use
+export const supabase = getSupabase()
 
 // Helper functions for common database operations
 
