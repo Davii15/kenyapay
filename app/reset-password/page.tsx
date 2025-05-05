@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { confirmPasswordReset } from "@/lib/auth"
+import { updatePassword } from "@/lib/auth"
 
 export default function ResetPasswordPage() {
   const router = useRouter()
@@ -57,7 +57,7 @@ export default function ResetPasswordPage() {
         throw new Error("Reset token is missing")
       }
 
-      await confirmPasswordReset(token, password)
+      await updatePassword(password)
       setIsSuccess(true)
 
       // Redirect to login after 3 seconds
