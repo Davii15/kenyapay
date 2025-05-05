@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js"
+import type { Database } from "@/types/supabase"
 
 // Types for our database tables
 export type User = {
@@ -9,8 +10,8 @@ export type User = {
   country?: string
   business_name?: string
   business_type?: string
-  passport_document_url?: string // Added for tourist verification
-  business_license_url?: string // Added for business verification
+  passport_document_url?: string
+  business_license_url?: string
   verification_status: "pending" | "verified" | "rejected"
   created_at: string
 }
@@ -97,38 +98,17 @@ export type Topup = {
   updated_at: string
 }
 
-// First declare the variables before using them
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ""
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-// Then check if they exist
 if (!supabaseUrl || !supabaseAnonKey) {
   console.error("Missing Supabase environment variables")
+  throw new Error(
+    "Supabase credentials not found. Please make sure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set in your environment variables.",
+  )
 }
 
-// Create a function to get the Supabase client to ensure it's only created when needed
-function getSupabaseClient() {
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error(
-      "Supabase credentials not found. Please make sure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set in your environment variables.",
-    )
-  }
-  return createClient(supabaseUrl, supabaseAnonKey)
-}
-
-// Lazy-loaded Supabase client
-let _supabaseClient: ReturnType<typeof createClient> | null = null
-
-// Get the Supabase client, creating it if it doesn't exist
-export function getSupabase() {
-  if (!_supabaseClient) {
-    _supabaseClient = getSupabaseClient()
-  }
-  return _supabaseClient
-}
-
-// Export the supabase client for direct use
-export const supabase = getSupabase()
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey)
 
 // Helper functions for common database operations
 
@@ -143,47 +123,6 @@ export async function getUserById(userId: string) {
 export async function getUserByEmail(email: string) {
   const { data, error } = await supabase.from("users").select("*").eq("email", email).single()
 
-  if (error && error.code !== "PGRST116") throw error // PGRST116 is "no rows returned"
-  return data as User | null
-}
-
-// File upload helpers
-export async function uploadUserDocument(file: File, userId: string, documentType: "passport" | "business_license") {
-  const fileExt = file.name.split(".").pop()
-  const fileName = `${userId}/${documentType}_${Date.now()}.${fileExt}`
-  const filePath = `documents/${fileName}`
-
-  const { data, error } = await supabase.storage.from("user_documents").upload(filePath, file, {
-    cacheControl: "3600",
-    upsert: false,
-  })
-
-  if (error) throw error
-
-  // Get public URL
-  const { data: publicUrlData } = supabase.storage.from("user_documents").getPublicUrl(filePath)
-
-  return publicUrlData.publicUrl
-}
-
-// Update user verification document URLs
-export async function updateUserDocuments(
-  userId: string,
-  updates: {
-    passport_document_url?: string
-    business_license_url?: string
-  },
-) {
-  const { data, error } = await supabase
-    .from("users")
-    .update({
-      ...updates,
-      verification_status: "pending", // Set to pending when documents are uploaded
-    })
-    .eq("id", userId)
-    .select()
-    .single()
-
   if (error) throw error
   return data as User
 }
@@ -192,8 +131,8 @@ export async function updateUserDocuments(
 export async function getWalletByUserId(userId: string) {
   const { data, error } = await supabase.from("wallets").select("*").eq("user_id", userId).single()
 
-  if (error && error.code !== "PGRST116") throw error
-  return data as Wallet | null
+  if (error) throw error
+  return data as Wallet
 }
 
 export async function updateWalletBalance(walletId: string, amount: number) {
@@ -269,51 +208,6 @@ export async function recordPlatformRevenue(revenue: Omit<PlatformRevenue, "id" 
   return data as PlatformRevenue
 }
 
-export async function getPlatformRevenue(
-  options: {
-    startDate?: string
-    endDate?: string
-    source?: PlatformRevenue["source"]
-    limit?: number
-  } = {},
-) {
-  let query = supabase.from("platform_revenue").select("*")
-
-  if (options.startDate) {
-    query = query.gte("created_at", options.startDate)
-  }
-
-  if (options.endDate) {
-    query = query.lte("created_at", options.endDate)
-  }
-
-  if (options.source) {
-    query = query.eq("source", options.source)
-  }
-
-  if (options.limit) {
-    query = query.limit(options.limit)
-  }
-
-  query = query.order("created_at", { ascending: false })
-
-  const { data, error } = await query
-
-  if (error) throw error
-  return data as PlatformRevenue[]
-}
-
-export async function getPlatformRevenueTotal(
-  options: {
-    startDate?: string
-    endDate?: string
-    source?: PlatformRevenue["source"]
-  } = {},
-) {
-  const revenues = await getPlatformRevenue(options)
-  return revenues.reduce((total, revenue) => total + revenue.amount, 0)
-}
-
 // Admin Logs operations
 export async function createAdminLog(log: Omit<AdminLog, "id" | "created_at">) {
   const { data, error } = await supabase
@@ -339,35 +233,16 @@ export async function getAdminLogs(
     limit?: number
   } = {},
 ) {
-  let query = supabase.from("admin_logs").select("*")
-
-  if (options.adminId) {
-    query = query.eq("admin_id", options.adminId)
-  }
-
-  if (options.entityType) {
-    query = query.eq("entity_type", options.entityType)
-  }
-
-  if (options.entityId) {
-    query = query.eq("entity_id", options.entityId)
-  }
-
-  if (options.startDate) {
-    query = query.gte("created_at", options.startDate)
-  }
-
-  if (options.endDate) {
-    query = query.lte("created_at", options.endDate)
-  }
-
-  if (options.limit) {
-    query = query.limit(options.limit)
-  }
-
-  query = query.order("created_at", { ascending: false })
-
-  const { data, error } = await query
+  const { data, error } = await supabase
+    .from("admin_logs")
+    .select("*")
+    .eq("admin_id", options.adminId)
+    .eq("entity_type", options.entityType)
+    .eq("entity_id", options.entityId)
+    .gte("created_at", options.startDate)
+    .lte("created_at", options.endDate)
+    .limit(options.limit)
+    .order("created_at", { ascending: false })
 
   if (error) throw error
   return data as AdminLog[]
@@ -408,8 +283,8 @@ export async function updatePaymentStatus(paymentId: string, status: Payment["st
 export async function getPaymentByTransactionId(transactionId: string) {
   const { data, error } = await supabase.from("payments").select("*").eq("transaction_id", transactionId).single()
 
-  if (error && error.code !== "PGRST116") throw error
-  return data as Payment | null
+  if (error) throw error
+  return data as Payment
 }
 
 // QR Code operations
