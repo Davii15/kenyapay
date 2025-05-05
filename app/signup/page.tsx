@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Globe, ArrowLeft, FileCheck } from "lucide-react"
@@ -34,6 +34,12 @@ export default function SignupPage() {
   })
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isClient, setIsClient] = useState(false)
+
+  // Use useEffect to ensure we're running on the client
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
@@ -113,6 +119,11 @@ export default function SignupPage() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  // Don't render the form until we're on the client to avoid hydration issues
+  if (!isClient) {
+    return <div className="flex min-h-screen items-center justify-center">Loading...</div>
   }
 
   return (
