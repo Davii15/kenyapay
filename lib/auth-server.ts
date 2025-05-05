@@ -2,9 +2,10 @@
 import { getServerSession as getNextAuthServerSession } from "next-auth/next"
 import { authOptions } from "./auth"
 import { createClient } from "@supabase/supabase-js"
+import type { Session } from "next-auth"
 
 // Get the server session
-export async function getServerSession() {
+export async function getServerSession(): Promise<Session | null> {
   return await getNextAuthServerSession(authOptions)
 }
 
