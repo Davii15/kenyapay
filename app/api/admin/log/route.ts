@@ -1,12 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createAdminLog, getAdminLogs } from "@/lib/supabaseClient"
-import { getServerSession } from "next-auth/next"
-import { authOptions } from "@/lib/auth"
+// Import from auth-server.ts instead of auth.ts to avoid client/server mixing
+import { getServerSession } from "@/lib/auth-server"
 
 export async function POST(request: NextRequest) {
   try {
-    // Get the admin session
-    const session = await getServerSession(authOptions)
+    // Get the admin session using our server-side function
+    const session = await getServerSession()
 
     if (!session || session.user.role !== "admin") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -46,8 +46,8 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    // Get the admin session
-    const session = await getServerSession(authOptions)
+    // Get the admin session using our server-side function
+    const session = await getServerSession()
 
     if (!session || session.user.role !== "admin") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
