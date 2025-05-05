@@ -290,6 +290,36 @@ export async function updatePassword(password: string) {
   }
 }
 
+export async function confirmPasswordReset(token: string, password: string) {
+  try {
+    const supabase = getSupabase()
+
+    // First verify the token
+    const { error: verifyError } = await supabase.auth.verifyOtp({
+      token_hash: token,
+      type: "recovery",
+    })
+
+    if (verifyError) {
+      throw verifyError
+    }
+
+    // Then update the password
+    const { error } = await supabase.auth.updateUser({
+      password,
+    })
+
+    if (error) {
+      throw error
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error("Password reset confirmation error:", error)
+    throw error
+  }
+}
+
 // Helper function to log authentication events
 async function logAuthEvent({
   user_id,
