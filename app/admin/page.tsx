@@ -24,7 +24,7 @@ import { UserGreeting } from "@/components/user-greeting"
 import { supabase } from "@/lib/supabaseClient"
 import { format } from "date-fns"
 import { Skeleton } from "@/components/ui/skeleton"
-import { DateRangePicker } from "@/components/ui/date-range-picker"
+import { DatePickerWithRange as DateRangePicker } from "@/components/ui/date-range-picker"
 import { addDays } from "date-fns"
 
 export default function AdminDashboard() {
@@ -178,9 +178,12 @@ export default function AdminDashboard() {
     window.location.href = "/login"
   }
 
-  const handleDateRangeChange = (range: { from: Date; to: Date }) => {
-    setDate(range)
-  }
+  useEffect(() => {
+    if (date?.from && date?.to) {
+      // Your existing date range change logic here
+      // This will run whenever the date state changes
+    }
+  }, [date, user])
 
   const handleExportTransactions = async () => {
     try {
@@ -354,7 +357,7 @@ export default function AdminDashboard() {
 
             {/* Date Range Picker */}
             <div className="mb-6">
-              <DateRangePicker date={date} onDateChange={handleDateRangeChange} />
+              <DateRangePicker date={date} setDate={setDate} className="w-auto" />
             </div>
 
             {/* Stats Cards */}
