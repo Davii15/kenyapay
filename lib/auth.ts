@@ -68,6 +68,11 @@ export const authOptions: NextAuthOptions = {
 }
 
 export function createClientComponentClient<Database = any>(options?: SupabaseClientOptions<"public">) {
+  // Only run on client side
+  if (typeof window === "undefined") {
+    throw new Error("createClientComponentClient can only be used on the client side")
+  }
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ""
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
 
