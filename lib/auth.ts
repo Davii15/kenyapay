@@ -1,6 +1,10 @@
 import { type SupabaseClientOptions, createClient } from "@supabase/supabase-js"
 
-// Check for environment variables and provide helpful error messages
+// First, declare all variables before using them
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ""
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
+
+// Then check for environment variables and provide helpful error messages
 if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
   console.error("ERROR: Missing environment variable NEXT_PUBLIC_SUPABASE_URL")
 }
@@ -8,11 +12,6 @@ if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
 if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
   console.error("ERROR: Missing environment variable NEXT_PUBLIC_SUPABASE_ANON_KEY")
 }
-
-// Use empty strings as fallbacks to prevent runtime errors
-// This will still cause Supabase operations to fail, but with clearer error messages
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ""
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
 
 // Create a function to get the Supabase client to ensure it's only created when needed
 // This helps with SSR and environment variable loading timing
