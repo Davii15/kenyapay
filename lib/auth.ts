@@ -1,4 +1,7 @@
 import { type SupabaseClientOptions, createClient } from "@supabase/supabase-js"
+import type { NextAuthOptions } from "next-auth"
+// Fix the import - CredentialsProvider is a default export, not a named export
+import CredentialsProvider from "next-auth/providers/credentials"
 
 // First, declare all variables before using them
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ""
@@ -35,18 +38,67 @@ function getSupabase() {
   return _supabaseClient
 }
 
-export const authOptions = {
+// Properly define authOptions as NextAuthOptions type
+export const authOptions: NextAuthOptions = {
+  providers: [
+    CredentialsProvider({
+      name: "Credentials",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) {
+          return null
+        }
+
+        try {
+          const { user, session } = await login({
+            email: credentials.email,
+            password: credentials.password,
+          })
+
+          if (!user) {
+            return null
+          }
+
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role,
+          }
+        } catch (error) {
+          console.error("Authentication error:", error)
+          return null
+        }
+      },
+    }),
+  ],
   callbacks: {
-    async session({ session, user }) {
-      return {
-        ...session,
-        user: {
-          ...user,
-          role: user.role,
-        },
+    async jwt({ token, user }) {
+      if (user) {
+        token.id = user.id
+        token.role = user.role
       }
+      return token
+    },
+    async session({ session, token }) {
+      if (token && session.user) {
+        session.user.id = token.id as string
+        session.user.role = token.role as string
+      }
+      return session
     },
   },
+  pages: {
+    signIn: "/login",
+    error: "/login",
+  },
+  session: {
+    strategy: "jwt",
+  },
+  secret: process.env.NEXTAUTH_SECRET,
 }
 
 export function createClientComponentClient<Database = any>(options?: SupabaseClientOptions<"public">) {
