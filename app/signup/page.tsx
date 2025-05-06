@@ -15,13 +15,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { UserGreeting } from "@/components/user-greeting"
 import { useToast } from "@/components/ui/use-toast"
-import dynamic from "next/dynamic"
+import { signUp } from "@/lib/auth"
 
-// Dynamically import the auth functions to avoid initialization issues
-const AuthModule = dynamic(() => import("@/lib/auth").then((mod) => ({ signUp: mod.signUp })), {
-  ssr: false,
-  loading: () => <p>Loading...</p>,
-})
+// Remove this dynamic import:
+// const AuthModule = dynamic(() => import("@/lib/auth").then((mod) => ({ signUp: mod.signUp })), {
+//   ssr: false,
+//   loading: () => <p>Loading...</p>,
+// })
 
 export default function SignupPage() {
   const router = useRouter()
@@ -41,21 +41,23 @@ export default function SignupPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isClient, setIsClient] = useState(false)
-  const [authLoaded, setAuthLoaded] = useState(false)
+  // Remove this state:
+  // const [authLoaded, setAuthLoaded] = useState(false)
 
   // Use useEffect to ensure we're running on the client
   useEffect(() => {
     setIsClient(true)
     // Set a flag when the auth module is loaded
-    const checkAuthLoaded = async () => {
-      try {
-        await AuthModule
-        setAuthLoaded(true)
-      } catch (err) {
-        console.error("Error loading auth module:", err)
-      }
-    }
-    checkAuthLoaded()
+    // And remove this from useEffect:
+    // const checkAuthLoaded = async () => {
+    //   try {
+    //     await AuthModule
+    //     setAuthLoaded(true)
+    //   } catch (err) {
+    //     console.error("Error loading auth module:", err)
+    //   }
+    // }
+    // checkAuthLoaded()
   }, [])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -112,13 +114,14 @@ export default function SignupPage() {
         businessLicenseFile: userType === "business" ? formData.businessLicenseFile : null,
       }
 
-      // Make sure the auth module is loaded
-      if (!authLoaded) {
-        throw new Error("Authentication module not loaded yet. Please try again.")
-      }
+      // Replace this:
+      // if (!authLoaded) {
+      //   throw new Error("Authentication module not loaded yet. Please try again.")
+      // }
+      // const { signUp } = await AuthModule
+      // const result = await signUp(signupData)
 
-      // Call signup function
-      const { signUp } = await AuthModule
+      // With this:
       const result = await signUp(signupData)
 
       if (!result.user) {
@@ -332,7 +335,11 @@ export default function SignupPage() {
                   required
                 />
               </div>
-              <Button type="submit" className="w-full" disabled={isLoading || !authLoaded}>
+              {/* Replace this:
+              // <Button type="submit" className="w-full" disabled={isLoading || !authLoaded}>
+
+              // With this: */}
+              <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? "Creating account..." : "Create Account"}
               </Button>
             </form>
