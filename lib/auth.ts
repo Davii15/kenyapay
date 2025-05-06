@@ -151,13 +151,24 @@ export async function signUp(userData: {
   businessLicenseFile?: File | null
 }) {
   try {
+    console.log("Starting signup process...")
     const supabase = getSupabase()
+
+    // Log the userData (excluding sensitive info)
+    console.log("Signup data:", {
+      email: userData.email,
+      name: userData.name,
+      role: userData.role,
+      hasPassportFile: !!userData.passportFile,
+      hasBusinessLicenseFile: !!userData.businessLicenseFile,
+    })
 
     // Start a transaction by using supabase functions
     const { email, password, name, role, country, businessName, businessType, passportFile, businessLicenseFile } =
       userData
 
     // 1. Create the auth user
+    console.log("Creating auth user...")
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
@@ -170,16 +181,20 @@ export async function signUp(userData: {
     })
 
     if (authError) {
+      console.error("Auth error during signup:", authError)
       throw authError
     }
 
     if (!authData.user) {
+      console.error("No user returned from auth.signUp")
       throw new Error("Failed to create user")
     }
 
     const userId = authData.user.id
+    console.log("Auth user created with ID:", userId)
 
     // 2. Create the user profile in the users table
+    console.log("Creating user profile...")
     const userProfile = {
       id: userId,
       email,
@@ -195,12 +210,14 @@ export async function signUp(userData: {
     const { error: profileError } = await supabase.from("users").insert(userProfile)
 
     if (profileError) {
+      console.error("Profile error during signup:", profileError)
       // Rollback by deleting the auth user
       await supabase.auth.admin.deleteUser(userId)
       throw profileError
     }
 
     // 3. Create a wallet for the user
+    console.log("Creating user wallet...")
     const { error: walletError } = await supabase.from("wallets").insert({
       user_id: userId,
       balance: 0,
@@ -209,6 +226,7 @@ export async function signUp(userData: {
     })
 
     if (walletError) {
+      console.error("Wallet error during signup:", walletError)
       // Rollback
       await supabase.from("users").delete().eq("id", userId)
       await supabase.auth.admin.deleteUser(userId)
