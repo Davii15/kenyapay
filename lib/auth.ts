@@ -55,7 +55,7 @@ const createSafeAuth = () => {
           email: email,
           name: userData.name,
           role: userData.role,
-          verification_status: "pending",
+         // verification_status: "pending",
           created_at: new Date().toISOString(),
         },
       ])
