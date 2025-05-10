@@ -25,47 +25,39 @@ const createSafeAuth = () => {
   // Get the Supabase client
   const supabase = getSupabase()
 
-
-//create users profile
-  async function signUp(email, password, userData) {
-  try {
-    // 1. Sign up
-    const { data: authData, error: authError } = await supabase.auth.signUp({
+  // Create a server action or API route
+export async function serverSignUp(email, password, userData) {
+  // Use service role client that bypasses RLS
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
+  
+  // 1. Create auth user
+  const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true
+  });
+  
+  if (authError) return { error: authError };
+  
+  // 2. Create user profile with the same client
+  const { error: profileError } = await supabaseAdmin
+    .from('users')
+    .insert({
+      id: authData.user.id,
       email,
-      password,
+      name: userData.name,
+      role: userData.role,
+      // other fields...
     });
     
-    if (authError) throw authError;
-    
-    // 2. Sign in immediately to get a session
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    
-    if (signInError) throw signInError;
-    
-    // 3. Now create the profile with an active session
-    const { error: profileError } = await supabase
-      .from('users')
-      .insert({
-        id: authData.user.id,
-        email,
-        name: userData.name,
-        role: userData.role,
-        // other fields...
-      });
-      
-    if (profileError) throw profileError;
-    
-    return { user: authData.user, error: null };
-  } catch (error) {
-    console.error("Signup error:", error);
-    return { user: null, error };
-  }
+  if (profileError) return { error: profileError };
+  
+  return { user: authData.user, error: null };
 }
-
-
       // Create a wallet for the user
       const { error: walletError } = await supabase.from("wallets").insert([
         {
