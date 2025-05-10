@@ -8,30 +8,21 @@ export interface Database {
           id: string
           admin_id: string
           action: string
-          entity_type: string
-          entity_id: string | null
           details: Json | null
-          ip_address: string | null
           created_at: string
         }
         Insert: {
           id?: string
           admin_id: string
           action: string
-          entity_type: string
-          entity_id?: string | null
           details?: Json | null
-          ip_address?: string | null
           created_at?: string
         }
         Update: {
           id?: string
           admin_id?: string
           action?: string
-          entity_type?: string
-          entity_id?: string | null
           details?: Json | null
-          ip_address?: string | null
           created_at?: string
         }
         Relationships: [
@@ -43,187 +34,83 @@ export interface Database {
           },
         ]
       }
-      payments: {
+      documents: {
         Row: {
           id: string
-          transaction_id: string
-          payment_provider: string
-          provider_transaction_id: string | null
-          amount: number
-          currency: string
-          status: string
-          payment_details: Json | null
-          created_at: string
-          updated_at: string
+          user_id: string
+          document_type: string
+          document_url: string
+          verification_status: string
+          uploaded_at: string
+          verified_at: string | null
+          verified_by: string | null
+          rejection_reason: string | null
         }
         Insert: {
           id?: string
-          transaction_id: string
-          payment_provider: string
-          provider_transaction_id?: string | null
-          amount: number
-          currency: string
-          status: string
-          payment_details?: Json | null
-          created_at?: string
-          updated_at?: string
+          user_id: string
+          document_type: string
+          document_url: string
+          verification_status?: string
+          uploaded_at?: string
+          verified_at?: string | null
+          verified_by?: string | null
+          rejection_reason?: string | null
         }
         Update: {
           id?: string
-          transaction_id?: string
-          payment_provider?: string
-          provider_transaction_id?: string | null
-          amount?: number
-          currency?: string
-          status?: string
-          payment_details?: Json | null
-          created_at?: string
-          updated_at?: string
+          user_id?: string
+          document_type?: string
+          document_url?: string
+          verification_status?: string
+          uploaded_at?: string
+          verified_at?: string | null
+          verified_by?: string | null
+          rejection_reason?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "payments_transaction_id_fkey"
-            columns: ["transaction_id"]
-            referencedRelation: "transactions"
+            foreignKeyName: "documents_user_id_fkey"
+            columns: ["user_id"]
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
-        ]
-      }
-      platform_revenue: {
-        Row: {
-          id: string
-          source: string
-          amount: number
-          transaction_id: string | null
-          description: string | null
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          source: string
-          amount: number
-          transaction_id?: string | null
-          description?: string | null
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          source?: string
-          amount?: number
-          transaction_id?: string | null
-          description?: string | null
-          created_at?: string
-        }
-        Relationships: [
           {
-            foreignKeyName: "platform_revenue_transaction_id_fkey"
-            columns: ["transaction_id"]
-            referencedRelation: "transactions"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      qr_codes: {
-        Row: {
-          id: string
-          business_id: string
-          type: string
-          amount: number | null
-          is_fixed_amount: boolean
-          title: string | null
-          description: string | null
-          times_scanned: number
-          active: boolean
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          business_id: string
-          type: string
-          amount?: number | null
-          is_fixed_amount: boolean
-          title?: string | null
-          description?: string | null
-          times_scanned?: number
-          active?: boolean
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          business_id?: string
-          type?: string
-          amount?: number | null
-          is_fixed_amount?: boolean
-          title?: string | null
-          description?: string | null
-          times_scanned?: number
-          active?: boolean
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "qr_codes_business_id_fkey"
-            columns: ["business_id"]
+            foreignKeyName: "documents_verified_by_fkey"
+            columns: ["verified_by"]
             referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
       }
-      topups: {
+      notifications: {
         Row: {
           id: string
           user_id: string
-          transaction_id: string
-          amount: number
-          source_currency: string
-          exchange_rate: number
-          ksh_amount: number
-          payment_provider: string
-          status: string
-          provider_reference: string | null
+          title: string
+          message: string
+          read: boolean
           created_at: string
-          updated_at: string
         }
         Insert: {
           id?: string
           user_id: string
-          transaction_id: string
-          amount: number
-          source_currency: string
-          exchange_rate: number
-          ksh_amount: number
-          payment_provider: string
-          status: string
-          provider_reference?: string | null
+          title: string
+          message: string
+          read?: boolean
           created_at?: string
-          updated_at?: string
         }
         Update: {
           id?: string
           user_id?: string
-          transaction_id?: string
-          amount?: number
-          source_currency?: string
-          exchange_rate?: number
-          ksh_amount?: number
-          payment_provider?: string
-          status?: string
-          provider_reference?: string | null
+          title?: string
+          message?: string
+          read?: boolean
           created_at?: string
-          updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "topups_transaction_id_fkey"
-            columns: ["transaction_id"]
-            referencedRelation: "transactions"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "topups_user_id_fkey"
+            foreignKeyName: "notifications_user_id_fkey"
             columns: ["user_id"]
             referencedRelation: "users"
             referencedColumns: ["id"]
@@ -233,47 +120,56 @@ export interface Database {
       transactions: {
         Row: {
           id: string
-          from_user_id: string | null
-          to_user_id: string | null
+          sender_id: string | null
+          receiver_id: string | null
           amount: number
-          type: string
+          fee: number
+          currency: string
+          transaction_type: string
           status: string
           payment_method: string | null
-          reference: string | null
+          payment_reference: string | null
           created_at: string
+          updated_at: string
         }
         Insert: {
           id?: string
-          from_user_id?: string | null
-          to_user_id?: string | null
+          sender_id?: string | null
+          receiver_id?: string | null
           amount: number
-          type: string
-          status: string
+          fee?: number
+          currency: string
+          transaction_type: string
+          status?: string
           payment_method?: string | null
-          reference?: string | null
+          payment_reference?: string | null
           created_at?: string
+          updated_at?: string
         }
         Update: {
           id?: string
-          from_user_id?: string | null
-          to_user_id?: string | null
+          sender_id?: string | null
+          receiver_id?: string | null
           amount?: number
-          type?: string
+          fee?: number
+          currency?: string
+          transaction_type?: string
           status?: string
           payment_method?: string | null
-          reference?: string | null
+          payment_reference?: string | null
           created_at?: string
+          updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "transactions_from_user_id_fkey"
-            columns: ["from_user_id"]
+            foreignKeyName: "transactions_receiver_id_fkey"
+            columns: ["receiver_id"]
             referencedRelation: "users"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "transactions_to_user_id_fkey"
-            columns: ["to_user_id"]
+            foreignKeyName: "transactions_sender_id_fkey"
+            columns: ["sender_id"]
             referencedRelation: "users"
             referencedColumns: ["id"]
           },
@@ -285,41 +181,48 @@ export interface Database {
           email: string
           name: string
           role: string
-          country: string | null
+          phone: string | null
           business_name: string | null
           business_type: string | null
-          passport_document_url: string | null
-          business_license_url: string | null
+          business_description: string | null
           verification_status: string
           created_at: string
+          updated_at: string | null
         }
         Insert: {
           id: string
           email: string
           name: string
           role: string
-          country?: string | null
+          phone?: string | null
           business_name?: string | null
           business_type?: string | null
-          passport_document_url?: string | null
-          business_license_url?: string | null
+          business_description?: string | null
           verification_status?: string
           created_at?: string
+          updated_at?: string | null
         }
         Update: {
           id?: string
           email?: string
           name?: string
           role?: string
-          country?: string | null
+          phone?: string | null
           business_name?: string | null
           business_type?: string | null
-          passport_document_url?: string | null
-          business_license_url?: string | null
+          business_description?: string | null
           verification_status?: string
           created_at?: string
+          updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "users_id_fkey"
+            columns: ["id"]
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       wallets: {
         Row: {
@@ -332,7 +235,7 @@ export interface Database {
         Insert: {
           id?: string
           user_id: string
-          balance: number
+          balance?: number
           currency: string
           updated_at?: string
         }
@@ -357,12 +260,7 @@ export interface Database {
       [_ in never]: never
     }
     Functions: {
-      increment_qr_scan: {
-        Args: {
-          qr_id: string
-        }
-        Returns: boolean
-      }
+      [_ in never]: never
     }
     Enums: {
       [_ in never]: never
