@@ -1,63 +1,114 @@
-// This file contains server-side authentication utilities
-import { getServerSession as getNextAuthServerSession } from "next-auth/next"
-import { authOptions } from "./auth"
-import { createClient } from "@supabase/supabase-js"
-import type { Session } from "next-auth"
+import { cookies } from "next/headers"
+import { createServerComponentClient } from "@supabase/auth-helpers-nextjs"
+import type { Database } from "@/types/supabase"
 
-// Get the server session
-export async function getServerSession(): Promise<Session | null> {
-  return await getNextAuthServerSession(authOptions)
+// Create a server-side Supabase client
+export async function createServerSupabaseClient() {
+  const cookieStore = cookies()
+  return createServerComponentClient<Database>({ cookies: () => cookieStore })
 }
 
-// Create a Supabase client for server-side operations
-export function createServerSupabaseClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-  if (!supabaseUrl || !supabaseServiceKey) {
-    throw new Error(
-      "Missing environment variables for Supabase. Please check NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.",
-    )
-  }
-
-  return createClient(supabaseUrl, supabaseServiceKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  })
-}
-
-// Get user by ID from the database
-export async function getUserById(userId: string) {
+// Get the current session on the server
+export async function getServerSession() {
   try {
-    const supabase = createServerSupabaseClient()
+    const supabase = await createServerSupabaseClient()
+    const {
+      data: { session },
+      error,
+    } = await supabase.auth.getSession()
+
+    if (error) {
+      console.error("Error getting session on server:", error)
+      return { session: null, error }
+    }
+
+    return { session, error: null }
+  } catch (error) {
+    console.error("Unexpected error getting session on server:", error)
+    return { session: null, error: error as Error }
+  }
+}
+
+// Get the current user on the server
+export async function getServerUser() {
+  try {
+    const { session, error } = await getServerSession()
+
+    if (error || !session) {
+      return { user: null, error: error || new Error("No session found") }
+    }
+
+    return { user: session.user, error: null }
+  } catch (error) {
+    console.error("Unexpected error getting user on server:", error)
+    return { user: null, error: error as Error }
+  }
+}
+
+// Get user profile data from the database
+export async function getUserProfile(userId: string) {
+  try {
+    const supabase = await createServerSupabaseClient()
+
     const { data, error } = await supabase.from("users").select("*").eq("id", userId).single()
 
     if (error) {
-      throw error
+      console.error("Error getting user profile:", error)
+      return { profile: null, error }
     }
 
-    return data
+    return { profile: data, error: null }
   } catch (error) {
-    console.error("Error fetching user by ID:", error)
-    return null
+    console.error("Unexpected error getting user profile:", error)
+    return { profile: null, error: error as Error }
   }
 }
 
-// Verify if a user has admin privileges
-export async function verifyAdminAccess(userId: string) {
+// Check if the current user has admin role
+export async function isAdmin() {
   try {
-    const supabase = createServerSupabaseClient()
-    const { data, error } = await supabase.from("users").select("role").eq("id", userId).single()
+    const { user, error } = await getServerUser()
 
-    if (error || !data) {
+    if (error || !user) {
+      return false
+    }
+
+    const supabase = await createServerSupabaseClient()
+
+    const { data, error: profileError } = await supabase.from("users").select("role").eq("id", user.id).single()
+
+    if (profileError || !data) {
+      console.error("Error checking admin role:", profileError)
       return false
     }
 
     return data.role === "admin"
   } catch (error) {
-    console.error("Error verifying admin access:", error)
+    console.error("Unexpected error checking admin role:", error)
     return false
+  }
+}
+
+// Log admin actions
+export async function logAdminAction(adminId: string, action: string, details: any = null) {
+  try {
+    const supabase = await createServerSupabaseClient()
+
+    const { error } = await supabase.from("admin_logs").insert({
+      admin_id: adminId,
+      action,
+      details,
+      created_at: new Date().toISOString(),
+    })
+
+    if (error) {
+      console.error("Error logging admin action:", error)
+      return { success: false, error }
+    }
+
+    return { success: true, error: null }
+  } catch (error) {
+    console.error("Unexpected error logging admin action:", error)
+    return { success: false, error: error as Error }
   }
 }
