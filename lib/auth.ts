@@ -25,47 +25,46 @@ const createSafeAuth = () => {
   // Get the Supabase client
   const supabase = getSupabase()
 
-  // Define auth functions
-  const signUp = async (email: string, password: string, userData: any) => {
-    try {
-      console.log("Starting signup process...")
 
-      // First, create the auth user
-      const { data, error } = await supabase.auth.signUp({
+//create users profile
+  async function signUp(email, password, userData) {
+  try {
+    // 1. Sign up
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email,
+      password,
+    });
+    
+    if (authError) throw authError;
+    
+    // 2. Sign in immediately to get a session
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    
+    if (signInError) throw signInError;
+    
+    // 3. Now create the profile with an active session
+    const { error: profileError } = await supabase
+      .from('users')
+      .insert({
+        id: authData.user.id,
         email,
-        password,
-      })
+        name: userData.name,
+        role: userData.role,
+        // other fields...
+      });
+      
+    if (profileError) throw profileError;
+    
+    return { user: authData.user, error: null };
+  } catch (error) {
+    console.error("Signup error:", error);
+    return { user: null, error };
+  }
+}
 
-      if (error) {
-        console.error("Signup error:", error)
-        return { error }
-      }
-
-      if (!data.user) {
-        console.error("No user returned from signUp")
-        return { error: new Error("No user returned from signUp") }
-      }
-
-      console.log("Auth user created successfully:", data.user.id)
-
-      // Then, insert the user data into the users table
-      const { error: profileError } = await supabase.from("users").insert([
-        {
-          id: data.user.id,
-          email: email,
-          name: userData.name,
-          role: userData.role,
-         // verification_status: "pending",
-          created_at: new Date().toISOString(),
-        },
-      ])
-
-      if (profileError) {
-        console.error("Profile creation error:", profileError)
-        return { error: profileError }
-      }
-
-      console.log("User profile created successfully")
 
       // Create a wallet for the user
       const { error: walletError } = await supabase.from("wallets").insert([
