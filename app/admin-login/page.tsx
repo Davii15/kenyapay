@@ -2,124 +2,151 @@
 
 import type React from "react"
 
-import { useState } from "react"
-import Link from "next/link"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { ShieldAlert, ArrowLeft } from "lucide-react"
+import { signIn } from "@/lib/auth"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { supabase } from "@/lib/supabaseClient"
+import { Loader2, ShieldAlert } from "lucide-react"
+import { getSupabase } from "@/lib/supabaseClient"
+
+// Check if we're running on the client side
+const isBrowser = typeof window !== "undefined"
 
 export default function AdminLoginPage() {
-  const router = useRouter()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isClient, setIsClient] = useState(false)
+
+  const router = useRouter()
+
+  // Set isClient to true once the component mounts
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsLoading(true)
+
+    // Clear previous errors
     setError(null)
 
+    // Validate form
+    if (!email || !password) {
+      setError("Email and password are required")
+      return
+    }
+
     try {
-      // Authenticate with Supabase
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
+      setLoading(true)
 
-      if (authError) throw authError
+      // Call the signIn function from auth.ts
+      const { error: signInError } = await signIn(email, password)
 
-      if (!authData.user) {
-        throw new Error("Authentication failed")
+      if (signInError) {
+        console.error("Login error:", signInError)
+        setError(signInError.message)
+        return
       }
 
-      // Check if user is an admin
+      // Check if the user has admin role
+      const supabase = getSupabase()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (!user) {
+        setError("Authentication failed")
+        return
+      }
+
       const { data: userData, error: userError } = await supabase
         .from("users")
         .select("role")
-        .eq("id", authData.user.id)
+        .eq("id", user.id)
         .single()
 
-      if (userError) throw userError
+      if (userError || !userData) {
+        console.error("Error fetching user role:", userError)
+        setError("Failed to verify admin privileges")
+        return
+      }
 
       if (userData.role !== "admin") {
+        setError("You do not have admin privileges")
+
         // Log unauthorized access attempt
         await supabase.from("admin_logs").insert({
-          admin_id: authData.user.id,
-          action: "login_attempt",
-          entity_type: "admin_panel",
-          details: { status: "unauthorized", email },
-          ip_address: "client-side", // In production, you'd get this from the server
+          admin_id: user.id,
+          action: "UNAUTHORIZED_ACCESS_ATTEMPT",
+          details: { email: user.email },
+          created_at: new Date().toISOString(),
         })
 
-        throw new Error("Unauthorized access. Only admins can access this area.")
+        return
       }
 
       // Log successful login
       await supabase.from("admin_logs").insert({
-        admin_id: authData.user.id,
-        action: "login",
-        entity_type: "admin_panel",
-        details: { status: "success" },
-        ip_address: "client-side", // In production, you'd get this from the server
+        admin_id: user.id,
+        action: "LOGIN",
+        details: { timestamp: new Date().toISOString() },
+        created_at: new Date().toISOString(),
       })
 
       // Redirect to admin dashboard
       router.push("/admin")
     } catch (err: any) {
-      console.error("Admin login error:", err)
-      setError(err.message || "Login failed. Please check your credentials.")
+      console.error("Unexpected error during login:", err)
+      setError(err.message || "An unexpected error occurred")
     } finally {
-      setIsLoading(false)
+      setLoading(false)
     }
   }
 
+  // If we're not on the client yet, show a loading state
+  if (!isClient) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="ml-2">Loading...</span>
+      </div>
+    )
+  }
+
   return (
-    <div className="container flex h-screen w-screen flex-col items-center justify-center">
-      <Link href="/" className="absolute left-4 top-4 md:left-8 md:top-8">
-        <Button variant="ghost" className="gap-2">
-          <ArrowLeft className="h-4 w-4" />
-          Back
-        </Button>
-      </Link>
-
-      <div className="mx-auto flex w-full flex-col justify-center space-y-6 sm:w-[350px]">
-        <div className="flex flex-col space-y-2 text-center">
-          <div className="flex justify-center">
-            <ShieldAlert className="h-8 w-8 text-amber-600" />
+    <div className="flex justify-center items-center min-h-screen bg-gray-50 p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <div className="flex justify-center mb-4">
+            <ShieldAlert className="h-12 w-12 text-primary" />
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight">Admin Access</h1>
-          <p className="text-sm text-muted-foreground">Enter your credentials to access the admin panel</p>
-        </div>
+          <CardTitle className="text-2xl font-bold text-center">Admin Access</CardTitle>
+          <CardDescription className="text-center">Sign in to access the admin dashboard</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {error && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
 
-        <Card>
-          <CardHeader>
-            <div className="bg-amber-50 text-amber-800 p-3 rounded-md text-sm">
-              This is a secure area. Unauthorized access attempts will be logged and reported.
-            </div>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleLogin} className="space-y-4">
-              {error && (
-                <Alert variant="destructive">
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
-
+          <form onSubmit={handleLogin}>
+            <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Admin Email</Label>
+                <Label htmlFor="email">Email</Label>
                 <Input
                   id="email"
                   type="email"
-                  placeholder="admin@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  required
+                  placeholder="admin@example.com"
+                  disabled={loading}
                 />
               </div>
 
@@ -130,20 +157,28 @@ export default function AdminLoginPage() {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  required
+                  placeholder="••••••••"
+                  disabled={loading}
                 />
               </div>
 
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "Verifying..." : "Access Admin Panel"}
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Verifying...
+                  </>
+                ) : (
+                  "Access Admin Panel"
+                )}
               </Button>
-            </form>
-          </CardContent>
-          <CardFooter className="flex justify-center">
-            <p className="text-xs text-muted-foreground">Need help? Contact the system administrator.</p>
-          </CardFooter>
-        </Card>
-      </div>
+            </div>
+          </form>
+        </CardContent>
+        <CardFooter className="flex justify-center">
+          <p className="text-sm text-gray-500">This area is restricted to authorized personnel only</p>
+        </CardFooter>
+      </Card>
     </div>
   )
 }
