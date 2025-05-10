@@ -1,393 +1,231 @@
-import type { SupabaseClientOptions } from "@supabase/supabase-js"
-import type { NextAuthOptions } from "next-auth"
-// Fix the import - CredentialsProvider is a default export, not a named export
-import CredentialsProvider from "next-auth/providers/credentials"
-import { getSupabase } from "@/lib/supabaseClient"
+"use client"
 
-// Properly define authOptions as NextAuthOptions type
-export const authOptions: NextAuthOptions = {
-  providers: [
-    CredentialsProvider({
-      name: "Credentials",
-      credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" },
-      },
-      async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          return null
-        }
+import { useState, useEffect } from "react"
+import { getSupabase } from "./supabaseClient"
+import { useRouter } from "next/navigation"
 
-        try {
-          const { user, session } = await login({
-            email: credentials.email,
-            password: credentials.password,
-          })
+// Check if we're running on the client side
+const isBrowser = typeof window !== "undefined"
 
-          if (!user) {
-            return null
-          }
-
-          return {
-            id: user.id,
-            email: user.email,
-            name: user.name,
-            role: user.role,
-          }
-        } catch (error) {
-          console.error("Authentication error:", error)
-          return null
-        }
-      },
-    }),
-  ],
-  callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
-        token.id = user.id
-        token.role = user.role
-      }
-      return token
-    },
-    async session({ session, token }) {
-      if (token && session.user) {
-        session.user.id = token.id as string
-        session.user.role = token.role as string
-      }
-      return session
-    },
-  },
-  pages: {
-    signIn: "/login",
-    error: "/login",
-  },
-  session: {
-    strategy: "jwt",
-  },
-  secret: process.env.NEXTAUTH_SECRET,
-}
-
-export function createClientComponentClient<Database = any>(options?: SupabaseClientOptions<"public">) {
-  // Only run on client side
-  if (typeof window === "undefined") {
-    throw new Error("createClientComponentClient can only be used on the client side")
+// Create a safe auth object that won't cause initialization errors
+const createSafeAuth = () => {
+  // Only initialize auth functions if we're on the client
+  if (!isBrowser) {
+    return {
+      signUp: async () => ({ error: new Error("Auth not available during SSR") }),
+      signIn: async () => ({ error: new Error("Auth not available during SSR") }),
+      signOut: async () => ({ error: new Error("Auth not available during SSR") }),
+      resetPassword: async () => ({ error: new Error("Auth not available during SSR") }),
+      updatePassword: async () => ({ error: new Error("Auth not available during SSR") }),
+      getSession: async () => ({ data: { session: null }, error: null }),
+      getUser: async () => ({ data: { user: null }, error: null }),
+    }
   }
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ""
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
+  // Get the Supabase client
+  const supabase = getSupabase()
 
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error(
-      "Supabase credentials not found. Please make sure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set in your environment variables.",
-    )
-  }
-
-  // Import createClient dynamically to avoid initialization issues
-  const { createClient } = require("@supabase/supabase-js")
-  return createClient<Database>(supabaseUrl, supabaseAnonKey, options)
-}
-
-// Authentication functions
-export async function login({ email, password }: { email: string; password: string }) {
-  try {
-    const supabase = getSupabase()
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
-
-    if (error) {
-      throw error
-    }
-
-    // Fetch additional user data from the users table
-    const { data: userData, error: userError } = await supabase
-      .from("users")
-      .select("*")
-      .eq("id", data.user?.id)
-      .single()
-
-    if (userError) {
-      throw userError
-    }
-
-    // Log the login event
-    await logAuthEvent({
-      user_id: data.user?.id,
-      event_type: "login",
-      details: "User logged in successfully",
-    })
-
-    return { user: userData, session: data.session }
-  } catch (error) {
-    console.error("Login error:", error)
-    throw error
-  }
-}
-
-export async function logout() {
-  try {
-    const supabase = getSupabase()
-    const { error } = await supabase.auth.signOut()
-    if (error) {
-      throw error
-    }
-    return { success: true }
-  } catch (error) {
-    console.error("Logout error:", error)
-    throw error
-  }
-}
-
-export async function signUp(userData: {
-  email: string
-  password: string
-  name: string
-  role: string
-  country?: string
-  businessName?: string
-  businessType?: string
-  passportFile?: File | null
-  businessLicenseFile?: File | null
-}) {
-  try {
-    console.log("Starting signup process...")
-    const supabase = getSupabase()
-
-    // Log the userData (excluding sensitive info)
-    console.log("Signup data:", {
-      email: userData.email,
-      name: userData.name,
-      role: userData.role,
-      hasPassportFile: !!userData.passportFile,
-      hasBusinessLicenseFile: !!userData.businessLicenseFile,
-    })
-
-    // Start a transaction by using supabase functions
-    const { email, password, name, role, country, businessName, businessType, passportFile, businessLicenseFile } =
-      userData
-
-    // 1. Create the auth user
-    console.log("Creating auth user...")
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          name,
-          role,
-        },
-      },
-    })
-
-    if (authError) {
-      console.error("Auth error during signup:", authError)
-      throw authError
-    }
-
-    if (!authData.user) {
-      console.error("No user returned from auth.signUp")
-      throw new Error("Failed to create user")
-    }
-
-    const userId = authData.user.id
-    console.log("Auth user created with ID:", userId)
-
-    // 2. Create the user profile in the users table
-    console.log("Creating user profile...")
-    const userProfile = {
-      id: userId,
-      email,
-      name,
-      role,
-      country: country || null,
-      business_name: businessName || null,
-      business_type: businessType || null,
-      verification_status: "pending",
-      created_at: new Date().toISOString(),
-    }
-
-    const { error: profileError } = await supabase.from("users").insert(userProfile)
-
-    if (profileError) {
-      console.error("Profile error during signup:", profileError)
-      // Rollback by deleting the auth user
-      await supabase.auth.admin.deleteUser(userId)
-      throw profileError
-    }
-
-    // 3. Create a wallet for the user
-    console.log("Creating user wallet...")
-    const { error: walletError } = await supabase.from("wallets").insert({
-      user_id: userId,
-      balance: 0,
-      currency: "KSH",
-      updated_at: new Date().toISOString(),
-    })
-
-    if (walletError) {
-      console.error("Wallet error during signup:", walletError)
-      // Rollback
-      await supabase.from("users").delete().eq("id", userId)
-      await supabase.auth.admin.deleteUser(userId)
-      throw walletError
-    }
-
-    // 4. Upload documents if provided
+  // Define auth functions
+  const signUp = async (email: string, password: string, userData: any) => {
     try {
-      // Upload passport document for tourists
-      if (role === "tourist" && passportFile) {
-        const fileExt = passportFile.name.split(".").pop()
-        const fileName = `${userId}-passport.${fileExt}`
-        const filePath = `documents/${fileName}`
+      console.log("Starting signup process...")
 
-        const { error: uploadError } = await supabase.storage.from("user_documents").upload(filePath, passportFile)
+      // First, create the auth user
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+      })
 
-        if (uploadError) {
-          console.error("Passport document upload error:", uploadError)
-        } else {
-          // Get public URL
-          const { data: publicUrlData } = supabase.storage.from("user_documents").getPublicUrl(filePath)
-
-          // Update user record with document URL
-          await supabase.from("users").update({ passport_document_url: publicUrlData.publicUrl }).eq("id", userId)
-        }
+      if (error) {
+        console.error("Signup error:", error)
+        return { error }
       }
 
-      // Upload business license for businesses
-      if (role === "business" && businessLicenseFile) {
-        const fileExt = businessLicenseFile.name.split(".").pop()
-        const fileName = `${userId}-business-license.${fileExt}`
-        const filePath = `documents/${fileName}`
-
-        const { error: uploadError } = await supabase.storage
-          .from("user_documents")
-          .upload(filePath, businessLicenseFile)
-
-        if (uploadError) {
-          console.error("Business license upload error:", uploadError)
-        } else {
-          // Get public URL
-          const { data: publicUrlData } = supabase.storage.from("user_documents").getPublicUrl(filePath)
-
-          // Update user record with document URL
-          await supabase.from("users").update({ business_license_url: publicUrlData.publicUrl }).eq("id", userId)
-        }
+      if (!data.user) {
+        console.error("No user returned from signUp")
+        return { error: new Error("No user returned from signUp") }
       }
-    } catch (uploadError) {
-      console.error("Document upload error:", uploadError)
-      // Continue with signup even if document upload fails
+
+      console.log("Auth user created successfully:", data.user.id)
+
+      // Then, insert the user data into the users table
+      const { error: profileError } = await supabase.from("users").insert([
+        {
+          id: data.user.id,
+          email: email,
+          name: userData.name,
+          role: userData.role,
+          verification_status: "pending",
+          created_at: new Date().toISOString(),
+        },
+      ])
+
+      if (profileError) {
+        console.error("Profile creation error:", profileError)
+        return { error: profileError }
+      }
+
+      console.log("User profile created successfully")
+
+      // Create a wallet for the user
+      const { error: walletError } = await supabase.from("wallets").insert([
+        {
+          user_id: data.user.id,
+          balance: 0,
+          currency: "KSH",
+          updated_at: new Date().toISOString(),
+        },
+      ])
+
+      if (walletError) {
+        console.error("Wallet creation error:", walletError)
+        return { error: walletError }
+      }
+
+      console.log("User wallet created successfully")
+
+      return { data, error: null }
+    } catch (err) {
+      console.error("Unexpected error during signup:", err)
+      return { error: err as Error }
     }
+  }
 
-    // 5. Log the signup event
-    await logAuthEvent({
-      user_id: userId,
-      event_type: "signup",
-      details: `New ${role} account created`,
-    })
+  const signIn = async (email: string, password: string) => {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
 
-    // Fetch the complete user data to return
-    const { data: userData, error: userDataError } = await supabase.from("users").select("*").eq("id", userId).single()
+      if (error) {
+        return { error }
+      }
 
-    if (userDataError) {
-      throw userDataError
+      return { data, error: null }
+    } catch (err) {
+      return { error: err as Error }
     }
+  }
 
-    return { user: userData, session: authData.session }
-  } catch (error) {
-    console.error("Signup error:", error)
-    throw error
+  const signOut = async () => {
+    try {
+      const { error } = await supabase.auth.signOut()
+      return { error }
+    } catch (err) {
+      return { error: err as Error }
+    }
+  }
+
+  const resetPassword = async (email: string) => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      })
+      return { error }
+    } catch (err) {
+      return { error: err as Error }
+    }
+  }
+
+  const updatePassword = async (password: string) => {
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password,
+      })
+      return { error }
+    } catch (err) {
+      return { error: err as Error }
+    }
+  }
+
+  const getSession = async () => {
+    try {
+      const { data, error } = await supabase.auth.getSession()
+      return { data, error }
+    } catch (err) {
+      return { data: { session: null }, error: err as Error }
+    }
+  }
+
+  const getUser = async () => {
+    try {
+      const { data, error } = await supabase.auth.getUser()
+      return { data, error }
+    } catch (err) {
+      return { data: { user: null }, error: err as Error }
+    }
+  }
+
+  return {
+    signUp,
+    signIn,
+    signOut,
+    resetPassword,
+    updatePassword,
+    getSession,
+    getUser,
   }
 }
 
-export async function resetPassword(email: string) {
-  try {
-    const supabase = getSupabase()
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/reset-password`,
-    })
+// Create the auth object safely
+const auth = createSafeAuth()
 
-    if (error) {
-      throw error
+// Export individual functions to avoid initialization issues
+export const { signUp, signIn, signOut, resetPassword, updatePassword, getSession, getUser } = auth
+
+// Hook for checking authentication status
+export function useAuth() {
+  const [user, setUser] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const router = useRouter()
+
+  useEffect(() => {
+    // Only run this effect on the client
+    if (!isBrowser) return
+
+    const checkUser = async () => {
+      try {
+        setLoading(true)
+        const { data } = await getSession()
+
+        if (data.session?.user) {
+          setUser(data.session.user)
+        } else {
+          setUser(null)
+        }
+      } catch (error) {
+        console.error("Error checking user:", error)
+        setUser(null)
+      } finally {
+        setLoading(false)
+      }
     }
 
-    return { success: true }
-  } catch (error) {
-    console.error("Reset password error:", error)
-    throw error
-  }
-}
+    // Check user on mount
+    checkUser()
 
-export async function updatePassword(password: string) {
-  try {
-    const supabase = getSupabase()
-    const { error } = await supabase.auth.updateUser({
-      password,
-    })
+    // Set up auth state listener
+    if (isBrowser) {
+      const supabase = getSupabase()
 
-    if (error) {
-      throw error
+      const {
+        data: { subscription },
+      } = supabase.auth.onAuthStateChange(async (event, session) => {
+        if (session?.user) {
+          setUser(session.user)
+        } else {
+          setUser(null)
+        }
+        setLoading(false)
+      })
+
+      // Clean up subscription
+      return () => {
+        subscription.unsubscribe()
+      }
     }
+  }, [router])
 
-    return { success: true }
-  } catch (error) {
-    console.error("Update password error:", error)
-    throw error
-  }
-}
-
-export async function confirmPasswordReset(token: string, password: string) {
-  try {
-    const supabase = getSupabase()
-
-    // First verify the token
-    const { error: verifyError } = await supabase.auth.verifyOtp({
-      token_hash: token,
-      type: "recovery",
-    })
-
-    if (verifyError) {
-      throw verifyError
-    }
-
-    // Then update the password
-    const { error } = await supabase.auth.updateUser({
-      password,
-    })
-
-    if (error) {
-      throw error
-    }
-
-    return { success: true }
-  } catch (error) {
-    console.error("Password reset confirmation error:", error)
-    throw error
-  }
-}
-
-// Helper function to log authentication events
-async function logAuthEvent({
-  user_id,
-  event_type,
-  details,
-}: {
-  user_id?: string
-  event_type: string
-  details: string
-}) {
-  try {
-    const supabase = getSupabase()
-    await supabase.from("admin_logs").insert({
-      admin_id: user_id || "system",
-      action: event_type,
-      entity_type: "user",
-      entity_id: user_id,
-      details,
-      created_at: new Date().toISOString(),
-    })
-  } catch (error) {
-    console.error("Failed to log auth event:", error)
-    // Don't throw here, as this is a non-critical operation
-  }
+  return { user, loading }
 }
