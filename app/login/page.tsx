@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -12,7 +11,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { UserGreeting } from "@/components/user-greeting"
-import { login } from "@/lib/auth"
+import { signIn } from "@/lib/auth"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useToast } from "@/components/ui/use-toast"
 
@@ -31,28 +30,29 @@ export default function LoginPage() {
     setError(null)
 
     try {
-      const result = await login({ email, password })
+      const { data, error: loginError } = await signIn(email, password)
+      const user = data?.user
 
-      if (!result.user) {
-        throw new Error("Login failed. Please check your credentials.")
+      if (!user || loginError) {
+        throw new Error(loginError?.message || "Login failed. Please check your credentials.")
       }
 
       // Check if user role matches selected tab
-      if (result.user.role !== userType) {
-        throw new Error(`This account is registered as a ${result.user.role}. Please select the correct account type.`)
+      if (user.role !== userType) {
+        throw new Error(`This account is registered as a ${user.role}. Please select the correct account type.`)
       }
 
       toast({
         title: "Login successful",
-        description: `Welcome back, ${result.user.name}!`,
+        description: `Welcome back, ${user.name || user.email}!`,
       })
 
       // Redirect based on user type
-      if (result.user.role === "tourist") {
+      if (user.role === "tourist") {
         router.push("/tourist/dashboard")
-      } else if (result.user.role === "business") {
+      } else if (user.role === "business") {
         router.push("/business/dashboard")
-      } else if (result.user.role === "admin") {
+      } else if (user.role === "admin") {
         router.push("/admin")
       }
     } catch (err) {
