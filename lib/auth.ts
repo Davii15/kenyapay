@@ -1,8 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
 import { getSupabase } from "./supabaseClient"
-import { useRouter } from "next/navigation"
 
 const isBrowser = typeof window !== "undefined"
 
@@ -23,40 +21,18 @@ const createSafeAuth = () => {
 
   const signUp = async (email: string, password: string, userData: any) => {
     try {
-      console.log("Starting signup process...")
-
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
       })
 
-      if (signUpError) {
-        console.error("Signup error:", signUpError)
-        return { error: signUpError }
+      if (signUpError || !signUpData.user) {
+        return { error: signUpError || new Error("No user returned from signUp") }
       }
 
       const user = signUpData.user
-      if (!user) {
-        console.error("No user returned from signUp")
-        return { error: new Error("No user returned from signUp") }
-      }
 
-      console.log("Auth user created successfully:", user.id)
-
-      // Wait briefly to allow session hydration (optional but helpful)
-      await new Promise((res) => setTimeout(res, 500))
-
-      const {
-        data: { session },
-        error: sessionError,
-      } = await supabase.auth.getSession()
-
-      if (!session || sessionError) {
-        console.error("Session not available after signUp:", sessionError)
-        return { error: new Error("User session is not established yet.") }
-      }
-
-      // Insert into the users table with proper RLS match
+      // Insert into users table
       const { error: profileError } = await supabase.from("users").insert([
         {
           id: user.id,
@@ -68,11 +44,8 @@ const createSafeAuth = () => {
       ])
 
       if (profileError) {
-        console.error("Profile creation error:", profileError)
         return { error: profileError }
       }
-
-      console.log("User profile created successfully")
 
       // Create wallet
       const { error: walletError } = await supabase.from("wallets").insert([
@@ -85,25 +58,44 @@ const createSafeAuth = () => {
       ])
 
       if (walletError) {
-        console.error("Wallet creation error:", walletError)
         return { error: walletError }
       }
 
-      console.log("User wallet created successfully")
       return { data: signUpData, error: null }
-
     } catch (err) {
-      console.error("Unexpected error during signup:", err)
       return { error: err as Error }
     }
   }
 
-  const signIn = async (email: string, password: string) => {
+  const login = async ({ email, password }: { email: string; password: string }) => {
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-      return { data, error }
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+
+      if (signInError || !signInData.session) {
+        return { user: null, error: signInError || new Error("Login failed") }
+      }
+
+      const userId = signInData.session.user.id
+
+      const { data: profile, error: profileError } = await supabase
+        .from("users")
+        .select("*")
+        .eq("id", userId)
+        .single()
+
+      if (profileError || !profile) {
+        return { user: null, error: profileError || new Error("User profile not found") }
+      }
+
+      return {
+        user: profile,
+        error: null,
+      }
     } catch (err) {
-      return { error: err as Error }
+      return { user: null, error: err as Error }
     }
   }
 
@@ -156,7 +148,7 @@ const createSafeAuth = () => {
 
   return {
     signUp,
-    signIn,
+    signIn: login,
     signOut,
     resetPassword,
     updatePassword,
@@ -176,34 +168,3 @@ export const {
   getSession,
   getUser,
 } = auth
-
-export function useAuth() {
-  const [user, setUser] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
-  const router = useRouter()
-
-  useEffect(() => {
-    if (!isBrowser) return
-
-    const checkUser = async () => {
-      setLoading(true)
-      const { data } = await getSession()
-      setUser(data.session?.user || null)
-      setLoading(false)
-    }
-
-    checkUser()
-
-    const supabase = getSupabase()
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      setUser(session?.user || null)
-      setLoading(false)
-    })
-
-    return () => subscription.unsubscribe()
-  }, [router])
-
-  return { user, loading }
-}
