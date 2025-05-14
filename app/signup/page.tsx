@@ -1,143 +1,101 @@
+// signup.tsx
 "use client"
 
-import type React from "react"
-
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { signUp } from "@/lib/auth"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2 } from "lucide-react"
+import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Globe, ArrowLeft } from "lucide-react"
+import { useToast } from "@/components/ui/use-toast"
+import { signUp } from "@/lib/auth"
 
-// Check if we're running on the client side
-const isBrowser = typeof window !== "undefined"
+export default function SignUpPage() {
+  const router = useRouter()
+  const { toast } = useToast()
 
-export default function SignupPage() {
-  const [name, setName] = useState("")
+  const [userType, setUserType] = useState("tourist")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [confirmPassword, setConfirmPassword] = useState("")
-  const [role, setRole] = useState("tourist")
-  const [loading, setLoading] = useState(false)
+  const [fullName, setFullName] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState(false)
-  const [isClient, setIsClient] = useState(false)
-
-  const router = useRouter()
-
-  // Set isClient to true once the component mounts
-  useEffect(() => {
-    setIsClient(true)
-  }, [])
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
-
-    // Clear previous errors
+    setIsLoading(true)
     setError(null)
 
-    // Validate form
-    if (!name || !email || !password || !confirmPassword) {
-      setError("All fields are required")
-      return
-    }
-
-    if (password !== confirmPassword) {
-      setError("Passwords do not match")
-      return
-    }
-
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters")
-      return
-    }
-
     try {
-      setLoading(true)
-      console.log("Starting signup process with role:", role)
-
-      // Call the signUp function from auth.ts
-      const { error: signUpError } = await signUp(email, password, {
-        name,
-        role,
+      const { error: signUpError, data } = await signUp(email, password, {
+        name: fullName,
+        role: userType,
       })
 
       if (signUpError) {
-        console.error("Signup error:", signUpError)
-        setError(signUpError.message)
-        return
+        throw signUpError
       }
 
-      // Signup successful
-      setSuccess(true)
+      toast({
+        title: "Signup successful",
+        description: data?.message || "Check your email to confirm your account.",
+      })
 
-      // Redirect based on role
-      setTimeout(() => {
-        if (role === "tourist") {
-          router.push("/tourist/dashboard")
-        } else if (role === "business") {
-          router.push("/business/dashboard")
-        }
-      }, 2000)
-    } catch (err: any) {
-      console.error("Unexpected error during signup:", err)
-      setError(err.message || "An unexpected error occurred")
+      router.push("/login")
+    } catch (err) {
+      console.error("Signup error:", err)
+      setError((err as Error).message || "An error occurred during signup")
     } finally {
-      setLoading(false)
+      setIsLoading(false)
     }
   }
 
-  // If we're not on the client yet, show a loading state
-  if (!isClient) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <span className="ml-2">Loading...</span>
-      </div>
-    )
-  }
-
   return (
-    <div className="flex justify-center items-center min-h-screen bg-gray-50 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle className="text-2xl font-bold text-center">Create an Account</CardTitle>
-          <CardDescription className="text-center">
-            Sign up to start using our currency exchange service
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {error && (
-            <Alert variant="destructive" className="mb-4">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
+    <div className="container flex h-screen w-screen flex-col items-center justify-center">
+      <Link href="/" className="absolute left-4 top-4 md:left-8 md:top-8">
+        <Button variant="ghost" className="gap-2">
+          <ArrowLeft className="h-4 w-4" />
+          Back
+        </Button>
+      </Link>
 
-          {success && (
-            <Alert className="mb-4 bg-green-50 text-green-700 border-green-200">
-              <AlertDescription>Account created successfully! Redirecting you to the dashboard...</AlertDescription>
-            </Alert>
-          )}
+      <div className="mx-auto flex w-full flex-col justify-center space-y-6 sm:w-[350px]">
+        <div className="flex flex-col space-y-2 text-center">
+          <div className="flex justify-center">
+            <Globe className="h-8 w-8 text-primary" />
+          </div>
+          <h1 className="text-xl font-semibold">Create an Account</h1>
+          <p className="text-sm text-muted-foreground">Fill in your details to get started</p>
+        </div>
 
-          <form onSubmit={handleSignup}>
-            <div className="space-y-4">
+        <Card>
+          <CardHeader>
+            <Tabs defaultValue="tourist" className="w-full" onValueChange={setUserType}>
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="tourist">Tourist</TabsTrigger>
+                <TabsTrigger value="business">Business</TabsTrigger>
+                <TabsTrigger value="admin">Admin</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </CardHeader>
+
+          <CardContent>
+            {error && (
+              <p className="mb-4 text-sm text-red-500">{error}</p>
+            )}
+            <form onSubmit={handleSignup} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Full Name</Label>
+                <Label htmlFor="fullName">Full Name</Label>
                 <Input
-                  id="name"
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="John Doe"
-                  disabled={loading}
+                  id="fullName"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  required
                 />
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
@@ -145,11 +103,9 @@ export default function SignupPage() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="john@example.com"
-                  disabled={loading}
+                  required
                 />
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
                 <Input
@@ -157,63 +113,27 @@ export default function SignupPage() {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  disabled={loading}
+                  required
                 />
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirm Password</Label>
-                <Input
-                  id="confirmPassword"
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="••••••••"
-                  disabled={loading}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Account Type</Label>
-                <RadioGroup value={role} onValueChange={setRole} className="flex flex-col space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="tourist" id="tourist" disabled={loading} />
-                    <Label htmlFor="tourist" className="cursor-pointer">
-                      Tourist (Exchange currency)
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="business" id="business" disabled={loading} />
-                    <Label htmlFor="business" className="cursor-pointer">
-                      Business (Accept payments)
-                    </Label>
-                  </div>
-                </RadioGroup>
-              </div>
-
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Creating Account...
-                  </>
-                ) : (
-                  "Create Account"
-                )}
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? "Creating account..." : "Sign Up"}
               </Button>
-            </div>
-          </form>
-        </CardContent>
-        <CardFooter className="flex justify-center">
-          <p className="text-sm text-gray-500">
-            Already have an account?{" "}
-            <Link href="/login" className="text-primary font-medium hover:underline">
-              Log in
-            </Link>
-          </p>
-        </CardFooter>
-      </Card>
+            </form>
+          </CardContent>
+
+          <CardFooter className="flex justify-center">
+            <p className="text-xs text-muted-foreground">
+              Already have an account?{' '}
+              <Link href="/login" className="text-primary hover:underline">
+                Sign in
+              </Link>
+            </p>
+          </CardFooter>
+        </Card>
+      </div>
     </div>
   )
 }
+
+
